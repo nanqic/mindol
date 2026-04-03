@@ -142,20 +142,89 @@ export async function copyTextToClipboard(text, retries = 3) {
     }
 }
 
-export const copyLink = async () => {
-    let rawUrl = location.href
-    try {
-        const resp = await fetch(`${import.meta.env.VITE_YOURLS_API}${rawUrl}`);
-        const json = await resp.json();
+export const SHARE_PARAM_KEY = 's'
 
-        if (json.statusCode == 200 || json.statusCode == 400) {
-            rawUrl = json.shorturl;
-        }
-    } catch (err) {
-        console.error('YOURLS_API err', err);
-    } finally {
-        await copyTextToClipboard(rawUrl);
+function toBase64Url(base64) {
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function fromBase64Url(base64Url) {
+    const normalized = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4))
+    return normalized + padding
+}
+
+export function encodeMindmapSharePath(path) {
+    const bytes = new TextEncoder().encode(path)
+    const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('')
+    return toBase64Url(btoa(binary))
+}
+
+export function decodeMindmapSharePath(token) {
+    try {
+        const binary = atob(fromBase64Url(token))
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+        const decoded = new TextDecoder().decode(bytes)
+        return decoded || null
+    } catch {
+        return null
     }
+}
+
+function getRouteBasePath() {
+    const rawBasePath = import.meta.env.VITE_BASE_URL || '/'
+    const withLeadingSlash = rawBasePath.startsWith('/') ? rawBasePath : `/${rawBasePath}`
+    const trimmed = withLeadingSlash.replace(/\/+$/g, '')
+    return trimmed || '/'
+}
+
+function getSharePathFromLocation() {
+    const basePath = getRouteBasePath()
+    let pathname = decodeURI(location.pathname)
+
+    if (basePath !== '/' && pathname.startsWith(basePath)) {
+        pathname = pathname.slice(basePath.length)
+    }
+
+    const normalizedPath = pathname.replace(/^\/+|\/+$/g, '')
+    if (!normalizedPath || !normalizedPath.toLowerCase().endsWith('.md')) {
+        return null
+    }
+    return normalizedPath
+}
+
+function getCurrentMindmapPath() {
+    const shareToken = new URLSearchParams(location.search).get(SHARE_PARAM_KEY)
+    if (shareToken) {
+        const decodedPath = decodeMindmapSharePath(shareToken)?.replace(/^\/+/, '')
+        if (decodedPath?.toLowerCase().endsWith('.md')) {
+            return decodedPath
+        }
+    }
+
+    return getSharePathFromLocation()
+}
+
+function getDownloadFileName() {
+    const path = getCurrentMindmapPath()
+    const rawName = path?.split('/').pop()?.replace(/\.md$/i, '') || 'mindmap'
+    const safeName = rawName.replace(/[\\/:*?"<>|]/g, '-').trim() || 'mindmap'
+    return `${safeName}.html`
+}
+
+export const copyLink = async () => {
+    const sharePath = getSharePathFromLocation()
+    let targetUrl = location.href
+
+    if (sharePath) {
+        const basePath = getRouteBasePath()
+        const baseUrl = basePath === '/' ? '/' : `${basePath}/`
+        const url = new URL(baseUrl, location.origin)
+        url.searchParams.set(SHARE_PARAM_KEY, encodeMindmapSharePath(sharePath))
+        targetUrl = url.toString()
+    }
+
+    await copyTextToClipboard(targetUrl)
 }
 
 export const downloadHtml = (htmlContent) => {
@@ -168,7 +237,7 @@ export const downloadHtml = (htmlContent) => {
     // 创建一个虚拟的a元素
     const a = document.createElement('a');
     a.href = url;
-    a.download = decodeURI(location.pathname.slice(1)).replace('/', '-').replace('md', 'html');
+    a.download = getDownloadFileName();
 
     // 模拟点击a元素
     document.body.appendChild(a);

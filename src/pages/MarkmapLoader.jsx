@@ -1,6 +1,6 @@
 import { lazy, useEffect, useReducer, useState } from 'react'
 import { useParams } from 'wouter'
-import { filterFile, postRequest, textRequest } from '../utils'
+import { decodeMindmapSharePath, filterFile, postRequest, SHARE_PARAM_KEY, textRequest } from '../utils'
 import Nav from '../components/Nav'
 
 const TextEdit = lazy(() => import('../components/TextEdit'))
@@ -45,6 +45,21 @@ const MarkmapLoader = () => {
   }, [])
 
   useEffect(() => {
+    const shareToken = new URLSearchParams(location.search).get(SHARE_PARAM_KEY)
+    if (shareToken) {
+      const decodedSharePath = decodeMindmapSharePath(shareToken)
+      const normalizedSharePath = decodedSharePath?.replace(/^\/+/, '')
+      if (normalizedSharePath?.toLowerCase().endsWith('.md')) {
+        const [shareFolderName] = normalizedSharePath.split('/')
+        if (shareFolderName && shareFolderName !== state.foldername) {
+          dispatch({ type: 'SET_FOLDERNAME', payload: shareFolderName })
+          loadUserFiles(shareFolderName)
+        }
+        loadTextBySharePath(normalizedSharePath)
+        return
+      }
+    }
+
     let foldername = decodeURI(params.foldername)
     if (foldername != ('undefined' || state.foldername)) {
       dispatch({ type: 'SET_FOLDERNAME', payload: foldername })
@@ -65,8 +80,12 @@ const MarkmapLoader = () => {
     const userArr = data.map(item => item.name)
     dispatch({ type: 'SET_USERLIST', payload: userArr });
 
-    let defaultUser = params.foldername ? decodeURI(params.foldername) : state.foldername;
-    if (!params.foldername && !state.foldername) {
+    const shareToken = new URLSearchParams(location.search).get(SHARE_PARAM_KEY)
+    const sharePath = shareToken ? decodeMindmapSharePath(shareToken)?.replace(/^\/+/, '') : ''
+    const shareFolderName = sharePath ? sharePath.split('/')[0] : ''
+    let defaultUser = shareFolderName || (params.foldername ? decodeURI(params.foldername) : state.foldername)
+
+    if (!defaultUser) {
       defaultUser = userArr[0]
     }
     dispatch({ type: 'SET_FOLDERNAME', payload: defaultUser })
@@ -87,7 +106,13 @@ const MarkmapLoader = () => {
   }
 
   const loadText = async (filename) => {
-    const fileUrl = `${import.meta.env.VITE_SERVER_URL}/p${import.meta.env.VITE_SERVER_PATH}/${params.foldername}/${filename}`
+    const fileUrl = `${import.meta.env.VITE_SERVER_URL}/d${import.meta.env.VITE_SERVER_PATH}/${params.foldername}/${filename}`
+    let resp = await textRequest(fileUrl)
+    setContent(resp)
+  }
+
+  const loadTextBySharePath = async (path) => {
+    const fileUrl = `${import.meta.env.VITE_SERVER_URL}/d${import.meta.env.VITE_SERVER_PATH}/${encodeURI(path)}`
     let resp = await textRequest(fileUrl)
     setContent(resp)
   }

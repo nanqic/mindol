@@ -3,6 +3,10 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sidebar-bg: #ffffff;
+}
+
 .mm-toolbar>.mm-toolbar-item,
 div>p,
 details>p,
@@ -46,4 +50,9 @@ div>p {
 
 .text-editor textarea {
   line-height: 1.5;
+}
+
+.sidebar-shell,
+.sidebar-panel {
+  background-color: var(--sidebar-bg);
 }

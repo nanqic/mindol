@@ -25,7 +25,7 @@ const FileTree = React.memo(
       localStorage.setItem("dir_open", JSON.stringify({ ...dir_opened, [`${state.foldername}-${name}`]: open }))
     }
     return (
-      <div className='text-gray-600 px-1.5 group inline-block bg-white'>
+      <div className='sidebar-panel text-gray-600 px-1.5 group inline-block'>
         {
           state.dirs?.sort(sortByFirstNum).map(file => {
             return (

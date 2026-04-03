@@ -36,7 +36,7 @@ export default function
     };
     return (
         <>
-            <details open>
+            <details open className='sidebar-shell'>
                 <summary className='flex items-center text-grey-500'>
                     <span title='折叠/展开'>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
